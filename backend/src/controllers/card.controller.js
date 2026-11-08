@@ -1,4 +1,5 @@
 import Card from '../models/Card.js';
+import Enrollment from '../models/Enrollment.js';
 import { normalizeUID } from '../utils/normalizeUID.js';
 
 /**
@@ -7,7 +8,7 @@ import { normalizeUID } from '../utils/normalizeUID.js';
  */
 export async function registerCard(req, res, next) {
   try {
-    const { uid, label } = req.body || {};
+    const { uid, label, enrollmentId } = req.body || {};
 
     if (!uid) {
       return res.status(400).json({
@@ -40,6 +41,14 @@ export async function registerCard(req, res, next) {
       label: typeof label === 'string' ? label.trim() : '',
       status: 'active',
     });
+
+    // If registered via remote enrollment session, mark session as completed
+    if (enrollmentId && typeof enrollmentId === 'string' && enrollmentId.trim()) {
+      await Enrollment.findOneAndUpdate(
+        { enrollmentId: enrollmentId.trim() },
+        { status: 'completed', completedAt: new Date() }
+      );
+    }
 
     return res.status(201).json({
       success: true,

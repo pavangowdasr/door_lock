@@ -1,0 +1,389 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266HTTPClient.h>
+#include <ArduinoJson.h>
+
+// -------------------- RFID PINS --------------------
+
+#define RFID_SS_PIN D8
+#define RFID_RST_PIN D3
+
+// -------------------- RELAY --------------------
+
+#define RELAY_PIN D1
+
+const uint8_t RELAY_ACTIVE_LEVEL = LOW;
+const uint8_t RELAY_LOCKED_LEVEL = HIGH;
+
+const unsigned long UNLOCK_DURATION = 3000;
+
+// -------------------- WIFI --------------------
+
+const char* WIFI_SSID = "POCO M3";
+const char* WIFI_PASSWORD = "pavangowda";
+
+// -------------------- BACKEND --------------------
+
+const char* BACKEND_BASE_URL = "http://192.168.43.95:5000/api";
+const char* API_URL = "http://192.168.43.95:5000/api/access/verify";
+
+const char* DEVICE_API_KEY = "81f6abd1a88ce3ff079022b8aed06eef52308b4a10eb493dfbda03c94296ff9c";
+
+const char* DEVICE_ID = "door-lock-01";
+
+// -------------------- OBJECTS & TIMING --------------------
+
+MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN);
+
+unsigned long lastReconnectAttempt = 0;
+const unsigned long RECONNECT_INTERVAL = 10000;
+
+// Polling interval for remote enrollment mode (1.5 seconds)
+unsigned long lastEnrollmentPoll = 0;
+const unsigned long ENROLLMENT_POLL_INTERVAL = 1500;
+
+bool isEnrollmentMode = false;
+String activeEnrollmentId = "";
+
+// -------------------- WIFI --------------------
+
+void connectWiFi() {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    Serial.print("Connecting to WiFi");
+
+    unsigned long startTime = millis();
+
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - startTime < 15000) {
+        delay(500);
+        Serial.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nWiFi connected!");
+        Serial.print("ESP8266 IP: ");
+        Serial.println(WiFi.localIP());
+    } else {
+        Serial.println("\nWiFi connection failed!");
+    }
+}
+
+void maintainWiFi() {
+    if (WiFi.status() == WL_CONNECTED) {
+        return;
+    }
+
+    if (millis() - lastReconnectAttempt >= RECONNECT_INTERVAL) {
+        lastReconnectAttempt = millis();
+
+        Serial.println("WiFi disconnected. Reconnecting...");
+        WiFi.reconnect();
+    }
+}
+
+// -------------------- UID CONVERSION --------------------
+
+String getUID() {
+    String uid = "";
+
+    for (byte i = 0; i < rfid.uid.size; i++) {
+        if (rfid.uid.uidByte[i] < 0x10) {
+            uid += "0";
+        }
+
+        uid += String(rfid.uid.uidByte[i], HEX);
+    }
+
+    uid.toUpperCase();
+
+    return uid;
+}
+
+// -------------------- BACKEND ACCESS VERIFICATION --------------------
+
+bool verifyAccess(const String& uid) {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("Cannot verify: WiFi unavailable.");
+        return false;
+    }
+
+    WiFiClient client;
+    HTTPClient http;
+
+    if (!http.begin(client, API_URL)) {
+        Serial.println("HTTP initialization failed.");
+        return false;
+    }
+
+    http.setTimeout(5000);
+
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_API_KEY);
+    http.addHeader("x-device-api-key", DEVICE_API_KEY);
+    http.addHeader("x-api-key", DEVICE_API_KEY);
+
+    JsonDocument request;
+    request["uid"] = uid;
+    request["deviceId"] = DEVICE_ID;
+
+    String payload;
+    serializeJson(request, payload);
+
+    Serial.println("Sending verification request...");
+
+    int httpCode = http.POST(payload);
+
+    if (httpCode != HTTP_CODE_OK) {
+        Serial.print("Backend HTTP error: ");
+        Serial.println(httpCode);
+
+        http.end();
+        return false;
+    }
+
+    String response = http.getString();
+
+    Serial.print("Backend response: ");
+    Serial.println(response);
+
+    JsonDocument result;
+    DeserializationError error = deserializeJson(result, response);
+
+    if (error) {
+        Serial.println("Invalid backend JSON response.");
+        http.end();
+        return false;
+    }
+
+    bool authorized = result["authorized"] | false;
+
+    http.end();
+
+    return authorized;
+}
+
+// -------------------- REMOTE ENROLLMENT --------------------
+
+/**
+ * Periodically polls the backend to check if the administrator has requested
+ * card enrollment for this device.
+ */
+void checkEnrollmentStatus() {
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastEnrollmentPoll < ENROLLMENT_POLL_INTERVAL) {
+        return;
+    }
+    lastEnrollmentPoll = currentMillis;
+
+    WiFiClient client;
+    HTTPClient http;
+
+    String url = String(BACKEND_BASE_URL) + "/enrollment/device/status?deviceId=" + DEVICE_ID;
+
+    if (!http.begin(client, url)) {
+        return;
+    }
+
+    http.setTimeout(3000);
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_API_KEY);
+    http.addHeader("x-device-api-key", DEVICE_API_KEY);
+    http.addHeader("x-api-key", DEVICE_API_KEY);
+
+    int httpCode = http.GET();
+
+    if (httpCode == HTTP_CODE_OK) {
+        String response = http.getString();
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, response);
+
+        if (!err && doc["success"]) {
+            bool active = doc["enrollmentActive"] | false;
+
+            if (active) {
+                if (!isEnrollmentMode) {
+                    Serial.println("\n============================================");
+                    Serial.println("[ENROLLMENT MODE ACTIVATED]");
+                    Serial.print("Session ID: ");
+                    Serial.println(doc["enrollmentId"].as<const char*>());
+                    Serial.print("Expires in: ");
+                    Serial.print(doc["expiresIn"].as<int>());
+                    Serial.println("s");
+                    Serial.println("Tap an RFID card to ENROLL (Relay disabled)");
+                    Serial.println("============================================");
+                }
+                isEnrollmentMode = true;
+                activeEnrollmentId = doc["enrollmentId"].as<String>();
+            } else {
+                if (isEnrollmentMode) {
+                    Serial.println("\n[ENROLLMENT] Enrollment session ended. Returning to normal access control.");
+                }
+                isEnrollmentMode = false;
+                activeEnrollmentId = "";
+            }
+        }
+    }
+
+    http.end();
+}
+
+/**
+ * Submits a scanned RFID UID to the backend enrollment endpoint.
+ * Does NOT verify access and NEVER activates the relay.
+ */
+bool submitEnrollmentScan(const String& uid, const String& enrollmentId) {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("Cannot submit enrollment scan: WiFi unavailable.");
+        return false;
+    }
+
+    WiFiClient client;
+    HTTPClient http;
+
+    String url = String(BACKEND_BASE_URL) + "/enrollment/device/scan";
+
+    if (!http.begin(client, url)) {
+        Serial.println("HTTP initialization failed for enrollment scan.");
+        return false;
+    }
+
+    http.setTimeout(5000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_API_KEY);
+    http.addHeader("x-device-api-key", DEVICE_API_KEY);
+    http.addHeader("x-api-key", DEVICE_API_KEY);
+
+    JsonDocument request;
+    request["uid"] = uid;
+    request["deviceId"] = DEVICE_ID;
+    if (enrollmentId.length() > 0) {
+        request["enrollmentId"] = enrollmentId;
+    }
+
+    String payload;
+    serializeJson(request, payload);
+
+    Serial.println("Submitting card to backend enrollment endpoint...");
+    int httpCode = http.POST(payload);
+
+    bool success = false;
+    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED) {
+        Serial.print("Enrollment scan registered! Backend response: ");
+        Serial.println(http.getString());
+        success = true;
+    } else {
+        Serial.print("Enrollment scan submission failed. HTTP code: ");
+        Serial.println(httpCode);
+        Serial.println(http.getString());
+        success = false;
+    }
+
+    http.end();
+    return success;
+}
+
+// -------------------- DOOR CONTROL --------------------
+
+void unlockDoor() {
+    Serial.println("[DOOR] Unlocking...");
+
+    digitalWrite(RELAY_PIN, RELAY_ACTIVE_LEVEL);
+
+    delay(UNLOCK_DURATION);
+
+    digitalWrite(RELAY_PIN, RELAY_LOCKED_LEVEL);
+
+    Serial.println("[DOOR] Locked again.");
+}
+
+// -------------------- RFID PROCESSING --------------------
+
+void processCard() {
+    if (!rfid.PICC_IsNewCardPresent()) {
+        return;
+    }
+
+    if (!rfid.PICC_ReadCardSerial()) {
+        return;
+    }
+
+    String uid = getUID();
+
+    Serial.println("\n-------------------------");
+    Serial.print("Card UID: ");
+    Serial.println(uid);
+
+    // If device is in enrollment mode, submit UID to enrollment session without unlocking relay
+    if (isEnrollmentMode) {
+        Serial.println("[ENROLLMENT] Processing scan for card enrollment...");
+        bool submitted = submitEnrollmentScan(uid, activeEnrollmentId);
+
+        if (submitted) {
+            Serial.println("[ENROLLMENT] Scan recorded by server. Admin confirmation pending on dashboard.");
+        } else {
+            Serial.println("[ENROLLMENT] Failed to record scan on server.");
+        }
+
+        // Exit enrollment mode locally after scan
+        isEnrollmentMode = false;
+        activeEnrollmentId = "";
+    } else {
+        // Normal door access control operation
+        bool authorized = verifyAccess(uid);
+
+        Serial.print("Authorization result: ");
+        Serial.println(authorized ? "TRUE" : "FALSE");
+
+        if (authorized) {
+            Serial.println("[ACCESS GRANTED]");
+            unlockDoor();
+        } else {
+            Serial.println("[ACCESS DENIED]");
+        }
+    }
+
+    Serial.println("-------------------------");
+
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+
+    delay(1000);
+}
+
+// -------------------- SETUP --------------------
+
+void setup() {
+    Serial.begin(74880);
+    delay(100);
+
+    Serial.println("\nIoT RFID Door Lock");
+    Serial.println("===================");
+
+    // Initialize relay in locked state.
+    digitalWrite(RELAY_PIN, RELAY_LOCKED_LEVEL);
+    pinMode(RELAY_PIN, OUTPUT);
+
+    connectWiFi();
+
+    SPI.begin();
+    rfid.PCD_Init();
+
+    Serial.println("RFID reader initialized.");
+    Serial.println("System ready. Normal access-control mode active.");
+}
+
+// -------------------- MAIN LOOP --------------------
+
+void loop() {
+    maintainWiFi();
+    checkEnrollmentStatus();
+    processCard();
+}

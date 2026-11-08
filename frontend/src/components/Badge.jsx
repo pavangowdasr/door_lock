@@ -23,8 +23,8 @@ export function Badge({ status, label, size = 'sm' }) {
 
   const sizeClasses =
     size === 'xs'
-      ? 'px-1.5 py-0.5 text-[11px]'
-      : 'px-2.5 py-0.5 text-xs font-medium';
+      ? 'px-2 py-0.5 text-[12px]'
+      : 'px-2.5 py-1 text-[13px] font-medium';
 
   return (
     <span

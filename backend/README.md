@@ -147,12 +147,20 @@ API keys can be supplied via either:
 | Method | Endpoint | Protection | Description |
 |---|---|---|---|
 | `GET` | `/api/health` | Public | Server uptime and MongoDB connection state |
-| `POST` | `/api/cards` | `ADMIN_API_KEY` | Register an RFID card |
-| `GET` | `/api/cards` | `ADMIN_API_KEY` | List registered cards with pagination |
-| `GET` | `/api/cards/:uid` | `ADMIN_API_KEY` | Retrieve a specific card by UID |
-| `PATCH` | `/api/cards/:uid/status` | `ADMIN_API_KEY` | Update card status (`active` or `revoked`) |
+| `POST` | `/api/auth/login` | Rate-limited | Single-admin login (sets HTTP-only cookie) |
+| `GET` | `/api/auth/me` | Admin Auth / API Key | Retrieve authenticated administrator profile |
+| `POST` | `/api/auth/logout` | Public | Clear admin session cookie |
+| `POST` | `/api/cards` | Admin Auth / API Key | Register an RFID card |
+| `GET` | `/api/cards` | Admin Auth / API Key | List registered cards with pagination |
+| `GET` | `/api/cards/:uid` | Admin Auth / API Key | Retrieve a specific card by UID |
+| `PATCH` | `/api/cards/:uid/status` | Admin Auth / API Key | Update card status (`active` or `revoked`) |
 | `POST` | `/api/access/verify` | `DEVICE_API_KEY` | Check authorization for an RFID card tap |
-| `GET` | `/api/access-logs` | `ADMIN_API_KEY` | Retrieve access audit logs (newest first) |
+| `GET` | `/api/access-logs` | Admin Auth / API Key | Retrieve access audit logs (newest first) |
+| `POST` | `/api/enrollment/start` | Admin Auth / API Key | Start remote enrollment session for a device |
+| `GET` | `/api/enrollment/device/status` | `DEVICE_API_KEY` | Polled by ESP8266 to check if enrollment mode is active |
+| `POST` | `/api/enrollment/device/scan` | `DEVICE_API_KEY` | Submitted by ESP8266 to record scanned card UID |
+| `GET` | `/api/enrollment/:enrollmentId` | Admin Auth / API Key | Polled by dashboard to detect scanned UID |
+| `POST` | `/api/enrollment/:enrollmentId/cancel` | Admin Auth / API Key | Cancel an active enrollment session |
 
 ---
 

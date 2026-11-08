@@ -32,11 +32,16 @@ export const cardsService = {
    * @param {object} cardData
    * @param {string} cardData.uid - Hexadecimal UID string
    * @param {string} [cardData.label] - Optional descriptive label
+   * @param {string} [cardData.enrollmentId] - Optional remote enrollment session ID
    */
-  async registerCard({ uid, label }) {
+  async registerCard({ uid, label, enrollmentId }) {
+    const body = { uid, label: label || '' };
+    if (enrollmentId) {
+      body.enrollmentId = enrollmentId;
+    }
     return apiRequest('/cards', {
       method: 'POST',
-      body: { uid, label: label || '' },
+      body,
     });
   },
 

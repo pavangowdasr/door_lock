@@ -1,6 +1,6 @@
 # IoT RFID Door Lock Management System
 
-Full-stack IoT access control solution comprising a Node.js + Express backend connected to MongoDB Atlas and a React + Vite + Tailwind CSS v4 administrative dashboard for managing physical RFID credentials and monitoring ESP8266 door lock units.
+Full-stack IoT access control solution comprising a Node.js + Express backend connected to MongoDB Atlas, an ESP8266 NodeMCU firmware with MFRC522 RFID reader and relay control, and a React + Vite + Tailwind CSS v4 administrative dashboard with remote RFID card enrollment.
 
 ## Repository Structure
 
@@ -8,29 +8,33 @@ Full-stack IoT access control solution comprising a Node.js + Express backend co
 ├── backend/                  # Node.js + Express REST API (MongoDB Atlas)
 │   ├── src/
 │   │   ├── config/           # Database connection & status
-│   │   ├── controllers/      # Auth, Card, and Access controllers
+│   │   ├── controllers/      # Auth, Card, Access, and Enrollment controllers
 │   │   ├── middleware/       # Error handling & API key/session auth
-│   │   ├── models/           # Mongoose schemas (Card, AccessLog)
-│   │   ├── routes/           # Express route definitions
+│   │   ├── models/           # Mongoose schemas (Card, AccessLog, Enrollment)
+│   │   ├── routes/           # Express route definitions (/auth, /cards, /access, /enrollment)
 │   │   ├── utils/            # UID normalizer & crypto password/session helpers
 │   │   ├── app.js            # Express application setup
 │   │   └── server.js         # HTTP server startup & graceful shutdown
-│   ├── tests/                # Automated Node.js native test suite
+│   ├── tests/                # Automated Node.js native test suite (48 tests)
 │   └── package.json
 │
-└── frontend/                 # React + Vite + Tailwind CSS v4 Admin Dashboard
-    ├── src/
-    │   ├── components/       # Badges, Modals, ConfirmDialogs, Skeletons
-    │   ├── context/          # AuthContext (session) & ToastContext
-    │   ├── layouts/          # DashboardLayout (sidebar, header, mobile drawer)
-    │   ├── pages/            # Login, Overview, Cards, Logs, Settings
-    │   ├── services/         # Centralized API service (api, auth, cards, logs)
-    │   ├── utils/            # Formatters & UID validation helpers
-    │   ├── App.jsx           # Client-side router & route protection
-    │   └── main.jsx
-    ├── index.html
-    ├── vite.config.js        # Vite dev proxy configuration
-    └── package.json
+├── frontend/                 # React + Vite + Tailwind CSS v4 Admin Dashboard
+│   ├── src/
+│   │   ├── components/       # Badges, Modals, ConfirmDialogs, Skeletons
+│   │   ├── context/          # AuthContext (session) & ToastContext
+│   │   ├── layouts/          # DashboardLayout (sidebar, header, mobile drawer)
+│   │   ├── pages/            # Login, Overview, Cards, Logs, Settings
+│   │   ├── services/         # Centralized API service (api, auth, cards, logs, enrollment)
+│   │   ├── utils/            # Formatters & UID validation helpers
+│   │   ├── App.jsx           # Client-side router & route protection
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── vite.config.js        # Vite dev proxy configuration
+│   └── package.json
+│
+└── firmware/                 # ESP8266 NodeMCU C++ Firmware
+    └── esp8266/
+        └── main.cpp          # Non-blocking RFID reader, relay control, & enrollment polling
 ```
 
 ## Quick Start Guide
@@ -64,7 +68,7 @@ Start the backend:
 npm run dev
 ```
 
-Run backend automated tests (36 tests):
+Run backend automated test suite (48 tests):
 ```bash
 npm test
 ```
@@ -80,9 +84,31 @@ npm run dev
 
 Open `http://localhost:5173` in your browser.
 
-## Security Architecture
+### 3. ESP8266 Firmware (PlatformIO)
 
-- **No Secrets Exposed**: Neither `ADMIN_API_KEY` nor `DEVICE_API_KEY` is present in browser bundles or client-side storage.
-- **Session Authentication**: Browser administration uses signed, HTTP-only cookies (`admin_session`) with `SameSite=Lax` and login rate limiting.
-- **Hardware Isolation**: The ESP8266 microcontroller verifies cards via `POST /api/access/verify` using `DEVICE_API_KEY` passed in the `x-device-api-key` header.
-- **API Tooling Support**: Bruno / Postman / cURL can still use `ADMIN_API_KEY` headers without restriction.
+The updated firmware is located at `firmware/esp8266/main.cpp` (and synchronized with `/home/pavan/Desktop/iot/esp8266_arduino/src/main.cpp`).
+
+Compile firmware:
+```bash
+pio run -d /home/pavan/Desktop/iot/esp8266_arduino
+```
+
+Upload to ESP8266:
+```bash
+pio run -d /home/pavan/Desktop/iot/esp8266_arduino --target upload
+```
+
+---
+
+## Remote Card Enrollment Workflow
+
+1. **Initiate**: Administrator clicks **Add RFID Card** on the dashboard and selects **Scan with ESP8266**.
+2. **Session Start**: Dashboard calls `POST /api/enrollment/start` (`deviceId: 'door-lock-01'`), creating an active 60s enrollment session.
+3. **Hardware Poll**: ESP8266 periodically polls `GET /api/enrollment/device/status?deviceId=door-lock-01` (every 1.5s).
+4. **Enrollment Mode**: ESP8266 enters enrollment mode and logs the session.
+5. **Card Tap**: Administrator taps an RFID tag against the MFRC522 reader.
+6. **Relay Safety**: The ESP8266 **never activates the relay** and submits the UID to `POST /api/enrollment/device/scan`.
+7. **Pending Scan**: Backend records the UID as a pending scan result (not authorized yet).
+8. **Dashboard Detection**: The dashboard polling detects the scanned UID, automatically populates the form, and prompts for an optional card label.
+9. **Confirmation**: Admin clicks **Confirm Registration** (`POST /api/cards`), saving the card in MongoDB and completing the enrollment session.
+10. **Device Reset**: The ESP8266 detects the completed session on its next poll and returns to normal door access control mode.
