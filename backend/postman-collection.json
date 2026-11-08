@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "IoT RFID Door Lock API",
+    "_postman_id": "c1f7a224-2c38-4e4b-91db-a38f36d12345",
+    "description": "Postman Collection for IoT RFID Door Lock Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "admin_api_key",
+      "value": "your_admin_secret_key_here",
+      "type": "string"
+    },
+    {
+      "key": "device_api_key",
+      "value": "your_device_secret_key_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "System Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Card Management",
+      "item": [
+        {
+          "name": "Register Card",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{admin_api_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"CEE4E857\",\n  \"label\": \"Admin Card\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cards",
+              "host": ["{{base_url}}"],
+              "path": ["cards"]
+            }
+          }
+        },
+        {
+          "name": "List Cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-api-key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cards?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["cards"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Card By UID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-api-key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cards/CEE4E857",
+              "host": ["{{base_url}}"],
+              "path": ["cards", "CEE4E857"]
+            }
+          }
+        },
+        {
+          "name": "Update Card Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{admin_api_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"revoked\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cards/CEE4E857/status",
+              "host": ["{{base_url}}"],
+              "path": ["cards", "CEE4E857", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Access Verification",
+      "item": [
+        {
+          "name": "Verify Card Access",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{device_api_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"CEE4E857\",\n  \"deviceId\": \"door-lock-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/access/verify",
+              "host": ["{{base_url}}"],
+              "path": ["access", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Access Logs",
+      "item": [
+        {
+          "name": "List Access Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-api-key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/access-logs?page=1&limit=20&result=granted",
+              "host": ["{{base_url}}"],
+              "path": ["access-logs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "result", "value": "granted" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

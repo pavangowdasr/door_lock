@@ -1,0 +1,256 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-11-08T07:50:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_door_lock_backend",
+      "parentId": null,
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "IoT RFID Door Lock API",
+      "description": "API collection for testing IoT RFID Door Lock Backend",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_door_lock_backend",
+      "parentId": "wrk_door_lock_backend",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:5000/api",
+        "admin_api_key": "your_admin_secret_key_here",
+        "device_api_key": "your_device_secret_key_here"
+      },
+      "dataPropertyOrder": {
+        "&": ["base_url", "admin_api_key", "device_api_key"]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1731052200000,
+      "_type": "environment"
+    },
+    {
+      "_id": "fld_health",
+      "parentId": "wrk_door_lock_backend",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "Health",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 100,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_health",
+      "parentId": "fld_health",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/health",
+      "name": "System Health",
+      "description": "Check API and MongoDB connection health",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": 101,
+      "_type": "request"
+    },
+    {
+      "_id": "fld_cards",
+      "parentId": "wrk_door_lock_backend",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "Card Management",
+      "description": "Admin endpoints to manage RFID cards",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 200,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_register_card",
+      "parentId": "fld_cards",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/cards",
+      "name": "Register Card",
+      "description": "Register a new RFID card",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"uid\": \"CEE4E857\",\n  \"label\": \"Admin Card\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "x-api-key",
+          "value": "{{ _.admin_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 201,
+      "_type": "request"
+    },
+    {
+      "_id": "req_list_cards",
+      "parentId": "fld_cards",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/cards",
+      "name": "List Cards",
+      "description": "List registered cards with pagination",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "page", "value": "1" },
+        { "name": "limit", "value": "10" }
+      ],
+      "headers": [
+        {
+          "name": "x-api-key",
+          "value": "{{ _.admin_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 202,
+      "_type": "request"
+    },
+    {
+      "_id": "req_get_card_by_uid",
+      "parentId": "fld_cards",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/cards/CEE4E857",
+      "name": "Get Card By UID",
+      "description": "Retrieve a specific card by its UID",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "x-api-key",
+          "value": "{{ _.admin_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 203,
+      "_type": "request"
+    },
+    {
+      "_id": "req_update_card_status",
+      "parentId": "fld_cards",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/cards/CEE4E857/status",
+      "name": "Update Card Status",
+      "description": "Update card status to active or revoked",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"revoked\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "x-api-key",
+          "value": "{{ _.admin_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 204,
+      "_type": "request"
+    },
+    {
+      "_id": "fld_access",
+      "parentId": "wrk_door_lock_backend",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "Access Verification",
+      "description": "IoT Device verification endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 300,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_verify_access",
+      "parentId": "fld_access",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/access/verify",
+      "name": "Verify RFID Card Access",
+      "description": "Verify whether an RFID card UID is authorized to unlock the door",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"uid\": \"CEE4E857\",\n  \"deviceId\": \"door-lock-01\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "x-api-key",
+          "value": "{{ _.device_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 301,
+      "_type": "request"
+    },
+    {
+      "_id": "fld_logs",
+      "parentId": "wrk_door_lock_backend",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "name": "Access Logs",
+      "description": "Admin endpoints to audit access events",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 400,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_list_logs",
+      "parentId": "fld_logs",
+      "modified": 1731052200000,
+      "created": 1731052200000,
+      "url": "{{ _.base_url }}/access-logs",
+      "name": "List Access Logs",
+      "description": "Retrieve audit logs sorted newest first with pagination and filtering",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        { "name": "page", "value": "1" },
+        { "name": "limit", "value": "20" },
+        { "name": "uid", "value": "CEE4E857" },
+        { "name": "result", "value": "granted" }
+      ],
+      "headers": [
+        {
+          "name": "x-api-key",
+          "value": "{{ _.admin_api_key }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 401,
+      "_type": "request"
+    }
+  ]
+}

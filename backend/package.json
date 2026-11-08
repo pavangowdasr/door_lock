@@ -1,0 +1,30 @@
+{
+  "name": "iot-rfid-door-lock-backend",
+  "version": "1.0.0",
+  "description": "Minimal, maintainable REST API backend for an IoT-based RFID door lock system",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/**/*.test.js"
+  },
+  "keywords": [
+    "iot",
+    "rfid",
+    "door-lock",
+    "express",
+    "mongoose",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "mongoose": "^8.9.5"
+  }
+}
