@@ -4,7 +4,10 @@
  * Secrets (API keys, passwords) are NEVER handled or stored in the browser.
  */
 
-const BASE_URL = '/api';
+// Configurable API base URL for production deployments (e.g. Render backend)
+// Defaults to '/api' for local dev proxy and Vercel rewrite setups
+const rawBase = import.meta.env.VITE_API_URL || '/api';
+const BASE_URL = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
 /**
  * Custom error class for API failures with backend status and payload details.

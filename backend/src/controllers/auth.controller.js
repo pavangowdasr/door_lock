@@ -50,11 +50,16 @@ export async function login(req, res, next) {
     );
 
     // Set secure HTTP-only cookie
+    // In production cross-origin deployments (e.g. Vercel frontend <-> Render backend),
+    // sameSite must be 'none' with secure: true so fetch with credentials includes the cookie.
     const isProduction = process.env.NODE_ENV === 'production';
+    const sameSiteSetting = process.env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax');
+    const isSecure = isProduction || sameSiteSetting === 'none';
+
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: sameSiteSetting,
       maxAge: SESSION_EXPIRY_MS,
       path: '/',
     });
@@ -92,10 +97,13 @@ export async function getMe(req, res) {
  */
 export async function logout(req, res) {
   const isProduction = process.env.NODE_ENV === 'production';
+  const sameSiteSetting = process.env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax');
+  const isSecure = isProduction || sameSiteSetting === 'none';
+
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: isSecure,
+    sameSite: sameSiteSetting,
     path: '/',
   });
 
