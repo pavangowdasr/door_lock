@@ -11,6 +11,7 @@ import {
   X,
   Server,
   Radio,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -80,6 +81,7 @@ export function DashboardLayout() {
     { label: 'Overview', to: '/', icon: LayoutDashboard },
     { label: 'RFID Cards', to: '/cards', icon: CreditCard },
     { label: 'Access Logs', to: '/logs', icon: History },
+    { label: 'Team', to: '/team', icon: Users },
     { label: 'Settings', to: '/settings', icon: Settings },
   ];
 

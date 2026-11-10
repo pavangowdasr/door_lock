@@ -1,6 +1,6 @@
 # IoT RFID Door Lock Management System
 
-Full-stack IoT access control solution comprising a Node.js + Express backend connected to MongoDB Atlas, an ESP8266 NodeMCU firmware with MFRC522 RFID reader and relay control, and a React + Vite + Tailwind CSS v4 administrative dashboard with remote RFID card enrollment.
+Full-stack IoT access control solution comprising a Node.js + Express backend connected to MongoDB Atlas, an ESP8266 NodeMCU firmware with MFRC522 RFID reader and relay control, and a React + Vite + Tailwind CSS v4 administrative dashboard with remote RFID card enrollment and authenticated remote door control.
 
 ## Repository Structure
 
@@ -8,14 +8,14 @@ Full-stack IoT access control solution comprising a Node.js + Express backend co
 ├── backend/                  # Node.js + Express REST API (MongoDB Atlas)
 │   ├── src/
 │   │   ├── config/           # Database connection & status
-│   │   ├── controllers/      # Auth, Card, Access, and Enrollment controllers
+│   │   ├── controllers/      # Auth, Card, Access, Enrollment, and Door controllers
 │   │   ├── middleware/       # Error handling & API key/session auth
-│   │   ├── models/           # Mongoose schemas (Card, AccessLog, Enrollment)
-│   │   ├── routes/           # Express route definitions (/auth, /cards, /access, /enrollment)
+│   │   ├── models/           # Mongoose schemas (Card, AccessLog, Enrollment, DoorCommand)
+│   │   ├── routes/           # Express route definitions (/auth, /cards, /access, /enrollment, /door)
 │   │   ├── utils/            # UID normalizer & crypto password/session helpers
 │   │   ├── app.js            # Express application setup
 │   │   └── server.js         # HTTP server startup & graceful shutdown
-│   ├── tests/                # Automated Node.js native test suite (48 tests)
+│   ├── tests/                # Automated Node.js native test suite (59 tests)
 │   └── package.json
 │
 ├── frontend/                 # React + Vite + Tailwind CSS v4 Admin Dashboard
@@ -23,8 +23,8 @@ Full-stack IoT access control solution comprising a Node.js + Express backend co
 │   │   ├── components/       # Badges, Modals, ConfirmDialogs, Skeletons
 │   │   ├── context/          # AuthContext (session) & ToastContext
 │   │   ├── layouts/          # DashboardLayout (sidebar, header, mobile drawer)
-│   │   ├── pages/            # Login, Overview, Cards, Logs, Settings
-│   │   ├── services/         # Centralized API service (api, auth, cards, logs, enrollment)
+│   │   ├── pages/            # Login, Overview (with Door Control), Cards, Logs, Settings
+│   │   ├── services/         # Centralized API service (api, auth, cards, logs, enrollment, door)
 │   │   ├── utils/            # Formatters & UID validation helpers
 │   │   ├── App.jsx           # Client-side router & route protection
 │   │   └── main.jsx
@@ -34,7 +34,7 @@ Full-stack IoT access control solution comprising a Node.js + Express backend co
 │
 └── firmware/                 # ESP8266 NodeMCU C++ Firmware
     └── esp8266/
-        └── main.cpp          # Non-blocking RFID reader, relay control, & enrollment polling
+        └── main.cpp          # Non-blocking RFID reader, relay control, enrollment & remote commands
 ```
 
 ## Quick Start Guide
@@ -68,7 +68,7 @@ Start the backend:
 npm run dev
 ```
 
-Run backend automated test suite (48 tests):
+Run backend automated test suite (59 tests):
 ```bash
 npm test
 ```

@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage.jsx';
 import { OverviewPage } from './pages/OverviewPage.jsx';
 import { CardsPage } from './pages/CardsPage.jsx';
 import { LogsPage } from './pages/LogsPage.jsx';
+import { TeamPage } from './pages/TeamPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
                 <Route path="/" element={<OverviewPage />} />
                 <Route path="/cards" element={<CardsPage />} />
                 <Route path="/logs" element={<LogsPage />} />
+                <Route path="/team" element={<TeamPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>

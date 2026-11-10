@@ -11,7 +11,7 @@
 #define RFID_SS_PIN D8
 #define RFID_RST_PIN D3
 
-// -------------------- RELAY --------------------
+// -------------------- RELAY CONFIGURATION --------------------
 
 #define RELAY_PIN D1
 
@@ -19,6 +19,17 @@ const uint8_t RELAY_ACTIVE_LEVEL = LOW;
 const uint8_t RELAY_LOCKED_LEVEL = HIGH;
 
 const unsigned long UNLOCK_DURATION = 3000;
+
+// Centralized Relay State Machine
+enum RelayControlState {
+    RELAY_STATE_LOCKED,
+    RELAY_STATE_UNLOCKED_RFID,
+    RELAY_STATE_UNLOCKED_ADMIN
+};
+
+RelayControlState currentRelayState = RELAY_STATE_LOCKED;
+unsigned long relayUnlockStartTime = 0;
+unsigned long relayUnlockDuration = 3000;
 
 // -------------------- WIFI --------------------
 
@@ -44,6 +55,10 @@ const unsigned long RECONNECT_INTERVAL = 10000;
 // Polling interval for remote enrollment mode (1.5 seconds)
 unsigned long lastEnrollmentPoll = 0;
 const unsigned long ENROLLMENT_POLL_INTERVAL = 1500;
+
+// Polling interval for remote door commands (1.5 seconds)
+unsigned long lastCommandPoll = 0;
+const unsigned long COMMAND_POLL_INTERVAL = 1500;
 
 bool isEnrollmentMode = false;
 String activeEnrollmentId = "";
@@ -83,6 +98,22 @@ void maintainWiFi() {
 
         Serial.println("WiFi disconnected. Reconnecting...");
         WiFi.reconnect();
+    }
+}
+
+// -------------------- NON-BLOCKING RELAY CONTROL --------------------
+
+/**
+ * Handles automatic timer expiration for active unlock pulses.
+ * Allows non-blocking operation without halting loop() or HTTP polling.
+ */
+void updateRelayState() {
+    if (currentRelayState != RELAY_STATE_LOCKED) {
+        if (millis() - relayUnlockStartTime >= relayUnlockDuration) {
+            digitalWrite(RELAY_PIN, RELAY_LOCKED_LEVEL);
+            currentRelayState = RELAY_STATE_LOCKED;
+            Serial.println("[DOOR] Unlock duration elapsed. Relay locked.");
+        }
     }
 }
 
@@ -165,6 +196,107 @@ bool verifyAccess(const String& uid) {
     http.end();
 
     return authorized;
+}
+
+// -------------------- REMOTE DOOR COMMANDS --------------------
+
+/**
+ * Acknowledges command execution back to the backend.
+ */
+void ackDoorCommand(const String& commandId, const String& status, const String& message = "") {
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    WiFiClient client;
+    HTTPClient http;
+    String url = String(BACKEND_BASE_URL) + "/door/commands/" + commandId + "/ack";
+
+    if (!http.begin(client, url)) {
+        return;
+    }
+
+    http.setTimeout(3000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_API_KEY);
+    http.addHeader("x-device-api-key", DEVICE_API_KEY);
+    http.addHeader("x-api-key", DEVICE_API_KEY);
+
+    JsonDocument request;
+    request["deviceId"] = DEVICE_ID;
+    request["status"] = status;
+    if (message.length() > 0) {
+        request["message"] = message;
+    }
+
+    String payload;
+    serializeJson(request, payload);
+
+    http.POST(payload);
+    http.end();
+}
+
+/**
+ * Polls the backend for remote door control commands (unlock / lock) from the admin dashboard.
+ */
+void checkDoorCommands() {
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastCommandPoll < COMMAND_POLL_INTERVAL) {
+        return;
+    }
+    lastCommandPoll = currentMillis;
+
+    WiFiClient client;
+    HTTPClient http;
+    String url = String(BACKEND_BASE_URL) + "/door/commands/next?deviceId=" + DEVICE_ID;
+
+    if (!http.begin(client, url)) {
+        return;
+    }
+
+    http.setTimeout(3000);
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_API_KEY);
+    http.addHeader("x-device-api-key", DEVICE_API_KEY);
+    http.addHeader("x-api-key", DEVICE_API_KEY);
+
+    int httpCode = http.GET();
+
+    if (httpCode == HTTP_CODE_OK) {
+        String response = http.getString();
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, response);
+
+        if (!err && doc["success"] && doc["hasCommand"]) {
+            String commandId = doc["command"]["commandId"].as<String>();
+            String type = doc["command"]["type"].as<String>();
+            unsigned long duration = doc["command"]["durationMs"] | 3000;
+
+            if (type == "unlock") {
+                Serial.println("\n[REMOTE COMMAND] Remote UNLOCK received from Dashboard!");
+                digitalWrite(RELAY_PIN, RELAY_ACTIVE_LEVEL);
+                currentRelayState = RELAY_STATE_UNLOCKED_ADMIN;
+                relayUnlockStartTime = millis();
+                relayUnlockDuration = duration;
+                Serial.printf("[DOOR] Relay energized for %lu ms.\n", duration);
+
+                ackDoorCommand(commandId, "executed");
+            } else if (type == "lock") {
+                Serial.println("\n[REMOTE COMMAND] Immediate LOCK received from Dashboard!");
+                digitalWrite(RELAY_PIN, RELAY_LOCKED_LEVEL);
+                currentRelayState = RELAY_STATE_LOCKED;
+                relayUnlockStartTime = 0;
+                Serial.println("[DOOR] Relay de-energized immediately (Locked).");
+
+                ackDoorCommand(commandId, "executed");
+            }
+        }
+    }
+
+    http.end();
 }
 
 // -------------------- REMOTE ENROLLMENT --------------------
@@ -290,20 +422,6 @@ bool submitEnrollmentScan(const String& uid, const String& enrollmentId) {
     return success;
 }
 
-// -------------------- DOOR CONTROL --------------------
-
-void unlockDoor() {
-    Serial.println("[DOOR] Unlocking...");
-
-    digitalWrite(RELAY_PIN, RELAY_ACTIVE_LEVEL);
-
-    delay(UNLOCK_DURATION);
-
-    digitalWrite(RELAY_PIN, RELAY_LOCKED_LEVEL);
-
-    Serial.println("[DOOR] Locked again.");
-}
-
 // -------------------- RFID PROCESSING --------------------
 
 void processCard() {
@@ -344,7 +462,12 @@ void processCard() {
 
         if (authorized) {
             Serial.println("[ACCESS GRANTED]");
-            unlockDoor();
+            // Non-blocking relay pulse
+            digitalWrite(RELAY_PIN, RELAY_ACTIVE_LEVEL);
+            currentRelayState = RELAY_STATE_UNLOCKED_RFID;
+            relayUnlockStartTime = millis();
+            relayUnlockDuration = UNLOCK_DURATION;
+            Serial.printf("[DOOR] Unlocked by RFID for %lu ms.\n", UNLOCK_DURATION);
         } else {
             Serial.println("[ACCESS DENIED]");
         }
@@ -355,7 +478,7 @@ void processCard() {
     rfid.PICC_HaltA();
     rfid.PCD_StopCrypto1();
 
-    delay(1000);
+    delay(500);
 }
 
 // -------------------- SETUP --------------------
@@ -377,13 +500,15 @@ void setup() {
     rfid.PCD_Init();
 
     Serial.println("RFID reader initialized.");
-    Serial.println("System ready. Normal access-control mode active.");
+    Serial.println("System ready. Normal access-control and remote polling active.");
 }
 
 // -------------------- MAIN LOOP --------------------
 
 void loop() {
     maintainWiFi();
+    updateRelayState();
     checkEnrollmentStatus();
+    checkDoorCommands();
     processCard();
 }

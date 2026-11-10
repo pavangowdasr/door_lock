@@ -161,6 +161,11 @@ API keys can be supplied via either:
 | `POST` | `/api/enrollment/device/scan` | `DEVICE_API_KEY` | Submitted by ESP8266 to record scanned card UID |
 | `GET` | `/api/enrollment/:enrollmentId` | Admin Auth / API Key | Polled by dashboard to detect scanned UID |
 | `POST` | `/api/enrollment/:enrollmentId/cancel` | Admin Auth / API Key | Cancel an active enrollment session |
+| `POST` | `/api/door/unlock` | Admin Auth / API Key | Queue a remote 3-second relay unlock command |
+| `POST` | `/api/door/lock` | Admin Auth / API Key | Immediately deactivate relay and cancel unlock pulse |
+| `GET` | `/api/door/commands/next` | `DEVICE_API_KEY` | Polled by ESP8266 for the next pending command |
+| `POST` | `/api/door/commands/:commandId/ack` | `DEVICE_API_KEY` | Acknowledge command execution by ESP8266 |
+| `GET` | `/api/door/status` | Admin Auth / API Key | Current relay control status & active commands |
 
 ---
 

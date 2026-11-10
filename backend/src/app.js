@@ -6,6 +6,7 @@ import cardRoutes from './routes/card.routes.js';
 import accessRoutes from './routes/access.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import enrollmentRoutes from './routes/enrollment.routes.js';
+import doorRoutes from './routes/door.routes.js';
 import { getDBStatus, isDBConnected } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 
@@ -52,6 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api', accessRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
+app.use('/api/door', doorRoutes);
 
 // 404 Handler
 app.use(notFoundHandler);
